@@ -3,12 +3,17 @@
 
 const WebSocket = require('ws');
 
+const SEED_INIT = 1;
+
 const WIDTH = 1600;
 const HEIGHT = 900;
 const UPDATE_RATE = 1000/60;
 
-const BALL_SPEED = 7;
+const BALL_SPEED = 6;
+const BALL_SIZE = 12;
+
 const PLAYER_SPEED = 4;
+const PLAYER_SIZE = 32;
 
 const CODE_A = 65;
 const CODE_D = 68;
@@ -16,14 +21,53 @@ const CODE_W = 87;
 const CODE_S = 83;
 const CODE_SPACE = 32;
 
+/* GLOBAL VARIABLES ****************************************************************************************************/
+var seed = SEED_INIT;
+var score_l = 0;
+var score_r = 0;
+
+/* FUNCTIONS ***********************************************************************************************************/
+// Standard Normal variate using Box-Muller transform.
+function random_bm(mean=0.5, sigma=0.125) {
+    let u = 0, v = 0;
+    while(u === 0) u = random(); //Converting [0,1) to (0,1)
+    while(v === 0) v = random();
+    let num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+    num = num / 10.0 + 0.5; // Translate to 0 -> 1
+    let diff_mean = mean - 0.5;
+    let diff_stddev = sigma / 0.125;
+    // bring value down to be around 0 and scale/translate
+    num -= 0.5;
+    num *= diff_stddev;
+    num += diff_mean + 0.5;
+    return num;
+}
+
+// Random uniform value between 0 and 1
+function random(min=0, max=1) {
+    let x = Math.sin(seed++) * 10000;
+    x = x - Math.floor(x);
+    let range = max - min;
+    x *= range;
+    x += min;
+    return x;
+}
+
+// round a floating point value with given significant figures
+function round_to_sigfigs(val, sigfigs){
+    return Number.parseFloat(val.toPrecision(sigfigs));
+}
+
 /* *************************************************************************************************************************************************************/
 /* BEGIN CLASSES ***********************************************************************************************************************************************/
 /* *************************************************************************************************************************************************************/
 
 class Entity {
-    constructor(x, y){
+    constructor(x, y, w, h){
         this.x = x;
         this.y = y;
+        this.width = w;
+        this.height = h;
         this.velx = 0;
         this.vely = 0;
         this.kinematic = false;
@@ -37,13 +81,12 @@ class Entity {
         }
     }
     
-    interact(entities){ }
     wall_collision(walls){ }
 }
 
 class Ball extends Entity {
     constructor(x, y){
-        super(x, y);
+        super(x, y, BALL_SIZE, BALL_SIZE);
         this.color = 'red';
         this.velx = random(-1,1);
         this.vely = random(-1,1);
@@ -59,10 +102,10 @@ class Ball extends Entity {
     move(){
         super.move();
         
-        if (this.x < canvas.width*1/8-16){
+        if (this.x < WIDTH*1/8-16){
             this.kinematic = false;
             this.scored = 1;
-        } else if (this.x > canvas.width*7/8+16){
+        } else if (this.x > WIDTH*7/8+16){
             this.kinematic = false;
             this.scored = -1;
         }
@@ -95,7 +138,7 @@ class Ball extends Entity {
 
 class Wall extends Entity {
     constructor(x, y, w, h, c, a){
-        super(x, y);
+        super(x, y, w, h);
         this.color = c;
         this.angle = a;
         this.id = 'wall';
@@ -106,7 +149,7 @@ class Wall extends Entity {
 
 class Player extends Entity {
     constructor(x, y){
-        super(x, y);
+        super(x, y, PLAYER_SIZE, PLAYER_SIZE);
         this.color = 'purple';
         this.vely = 0;
         this.velx = 0;
@@ -131,50 +174,41 @@ class Player extends Entity {
             if (this.grab_ball != null && this.grab_ball.grabbed){
                 let curtime = new Date().getTime();
                 let ang = this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir;
-                console.log(ang);
                 this.grab_ball.velx = Math.cos(ang) * this.grab_dir;
                 this.grab_ball.vely = -Math.sin(ang) * this.grab_dir;
                 this.grab_ball.normalize_velocity();
                 this.grab_ball.kinematic = true;
                 this.grab_ball.grabbed = false;
                 this.grab_dir = 1;
-
-                console.log(this.grab_ball.velx);
-                console.log(this.grab_ball.vely);
-
                 this.grab_ball = null;
             }
         }
     }
 
-    interact(entities){
+    interact(b){
         if (this.keys[CODE_SPACE]){
-            for (let i = 0; i < entities.length; i++){
-                if (entities[i].id == 'ball'){
-                    if (!entities[i].grabbed){
-                        this.grab_ball = entities[i];
-                        let dist = distance_to(this.x, this.y, this.grab_ball.x, this.grab_ball.y);
-                        if (dist < this.grab_range && dist > this.width/2){
-                            this.grab_ball.kinematic = false;
-                            this.grab_ball.grabbed = true;
-                            this.grab_time = new Date().getTime();
-                            let dy = this.y - this.grab_ball.y;
-                            let dx = this.x - this.grab_ball.x;
-                            this.grab_angle = Math.atan2(-dy,dx) - Math.PI/2;
-                            let cross = cross_product(dx, dy, this.grab_ball.velx, this.grab_ball.vely);
-                            if (cross > 0){
-                                this.grab_dir = 1;
-                            } else if (cross < 0){
-                                this.grab_dir = -1;
-                            }
-                        }
-                    } else {
-                        if (this.grab_ball != null){
-                            let curtime = new Date().getTime();
-                            this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
-                            this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * entities[i].speed/1000 * this.grab_dir) * this.grab_range;
-                        }
+            if (!b.grabbed){
+                this.grab_ball = b;
+                let dist = distance_to(this.x, this.y, this.grab_ball.x, this.grab_ball.y);
+                if (dist < this.grab_range && dist > this.width/2){
+                    this.grab_ball.kinematic = false;
+                    this.grab_ball.grabbed = true;
+                    this.grab_time = new Date().getTime();
+                    let dy = this.y - this.grab_ball.y;
+                    let dx = this.x - this.grab_ball.x;
+                    this.grab_angle = Math.atan2(-dy,dx) - Math.PI/2;
+                    let cross = cross_product(dx, dy, this.grab_ball.velx, this.grab_ball.vely);
+                    if (cross > 0){
+                        this.grab_dir = 1;
+                    } else if (cross < 0){
+                        this.grab_dir = -1;
                     }
+                }
+            } else {
+                if (this.grab_ball != null){
+                    let curtime = new Date().getTime();
+                    this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
+                    this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
                 }
             }
         }
@@ -215,10 +249,20 @@ class Player extends Entity {
 /* END CLASSES *************************************************************************************************************************************************/
 /* *************************************************************************************************************************************************************/
 
-
 var players = {};
 
-var ball = {};
+var b = new Ball(WIDTH/2, HEIGHT/2);
+
+var ball = {'entity': b};
+
+var walls = [];
+
+walls.push(new Wall(WIDTH*1/2, HEIGHT*1/8, WIDTH*3/4 + 16, 16, 'blue', 0));
+walls.push(new Wall(WIDTH*1/2, HEIGHT*7/8, WIDTH*3/4 + 16, 16, 'blue', 0));
+walls.push(new Wall(WIDTH*1/8, HEIGHT*1/4, 16, HEIGHT*1/4, 'blue', 0));
+walls.push(new Wall(WIDTH*1/8, HEIGHT*3/4, 16, HEIGHT*1/4, 'blue', 0));
+walls.push(new Wall(WIDTH*7/8, HEIGHT*1/4, 16, HEIGHT*1/4, 'blue', 0));
+walls.push(new Wall(WIDTH*7/8, HEIGHT*3/4, 16, HEIGHT*1/4, 'blue', 0));
 
 const wss = new WebSocket.Server({
   port: 5000
@@ -285,20 +329,25 @@ setInterval(update, UPDATE_RATE);
 function update(){
     for (let i = 0; i < Object.keys(players).length; i++){
         ent = players[Object.keys(players)[i]]['entity'];
-        //ent.interact(entities);
+        ent.interact(ball['entity']);
         ent.move();
-        //ent.wall_collision(walls);
+        ent.wall_collision(walls);
     }
 
-    /*
-    if (get_ball().scored){
-        score_l += get_ball().scored > 0 ? 1 : 0;
-        score_r += get_ball().scored < 0 ? 1 : 0;
+    ball['entity'].move();
+    ball['entity'].wall_collision(walls);
+
+    if (ball['entity'].scored){
+        score_l += ball['entity'].scored > 0 ? 1 : 0;
+        score_r += ball['entity'].scored < 0 ? 1 : 0;
         reset_game();
     }
-    */
 
     send_state();
+}
+
+function reset_game(){
+    ball['entity'] = new Ball(WIDTH/2, HEIGHT/2);
 }
 
 function send_state(){
@@ -308,6 +357,26 @@ function send_state(){
     }
 
     for (let i = 0; i < Object.keys(players).length; i++){
-        resp_d(players[Object.keys(players)[i]]['ws'], {'type': 'tick', 'players': ps, 'ball': ball});
+        resp_d(players[Object.keys(players)[i]]['ws'], {'type': 'tick', 'players': ps, 'ball': ball['entity']});
     }
+}
+
+/*
+Find the vector distance between 2 points
+    @arg x1: int; point x1
+    @arg y1: int; point y1
+    @arg x2: int; point x2
+    @arg y2: int; point y2
+    @return: float; distance between the two points
+*/
+function distance_to(x1, y1, x2, y2){
+    return Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+}
+
+function magnitude(x, y){
+    return Math.sqrt(x**2 + y**2)
+}
+
+function cross_product(x1, y1, x2, y2){
+    return x1*y2 - y1*x2;
 }
