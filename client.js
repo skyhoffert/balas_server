@@ -29,7 +29,6 @@ ws.on('open', function open() {
     let start = new Date().getTime();
     ws.send(JSON.stringify(INIT_MSG));
     ws.send(JSON.stringify({'type': 'ping', 'time': (new Date().getTime())}));
-    ws.send(JSON.stringify({'type': 'player_position', 'id': ID, 'x': 0, 'y': 0}));
 });
 
 ws.on('message', function incoming(data) {
@@ -67,13 +66,15 @@ ws.on('error', function error(err){
     console.log('error: ' + err);
 });
 
-/*
-let last_time = new Date().getTime();
-while (1){
-    while((new Date().getTime()) < last_time+(1000/30)){}
-    
-    if (ID != -1){
-        ws.send(JSON.stringify({'type': 'ping', 'time': (new Date().getTime())}));
+var x = 0.0;
+var y = 0.0;
+
+setInterval(function update() {
+    if (ws.readyState === 1){
+        if (ID != -1){
+            ws.send(JSON.stringify({'type': 'player_position', 'id': ID, 'x': x, 'y': y}));
+            x += 0.1;
+            y += 0.1;
+        }
     }
-}
-*/
+}, 1000/30);

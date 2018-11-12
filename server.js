@@ -36,7 +36,7 @@ wss.on('connection', function connection(ws){
             case 'player_position':
                 for (let i = 0; i < players.length; i++){
                     if (obj['id'] != players[i]['id']){
-                        if (players[i]['ws'].readyState != 'CLOSED'){
+                        if (players[i]['ws'].readyState === 1){
                             resp_d(players[i]['ws'], obj);
                         }
                     }
