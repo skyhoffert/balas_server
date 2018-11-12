@@ -221,11 +221,13 @@ var players = {};
 var ball = {};
 
 const wss = new WebSocket.Server({
-  port: 443
+  port: 5000
 });
 
 function resp_d(s, msg){
-    s.send(JSON.stringify(msg));
+    if (s.readyState === 1){
+        s.send(JSON.stringify(msg));
+    }
 }
 
 wss.on('connection', function connection(ws){
