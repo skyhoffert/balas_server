@@ -3,7 +3,7 @@ const WebSocket = require('ws');
 var players = {};
 
 const wss = new WebSocket.Server({
-  port: 5000
+  port: 443
 });
 
 function resp_d(s, msg){
