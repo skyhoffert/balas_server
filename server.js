@@ -150,7 +150,7 @@ class Wall extends Entity {
 class Player extends Entity {
     constructor(x, y){
         super(x, y, PLAYER_SIZE, PLAYER_SIZE);
-        this.color = 'purple';
+        this.color = "#"+((1<<24)*Math.random()|0).toString(16);
         this.vely = 0;
         this.velx = 0;
         this.kinematic = true;
