@@ -28,7 +28,6 @@ function key_msg(code, down=true) {
 ws.on('open', function open() {
     let start = new Date().getTime();
     ws.send(JSON.stringify(INIT_MSG));
-    ws.send(JSON.stringify({'type': 'ping', 'time': (new Date().getTime())}));
 });
 
 ws.on('message', function incoming(data) {
@@ -45,10 +44,10 @@ ws.on('message', function incoming(data) {
         case 'pong':
             let elapsed = (new Date().getTime()) - obj['time'];
             console.log('Ping: ' + elapsed + ' ms');
-            ws.send(JSON.stringify({'type': 'ack', 'message': 'OK'}));
+            ws.send(JSON.stringify({'type': 'ack', 'id': ID, 'message': 'OK'}));
             break;
         case 'ping':
-            let resp = JSON.stringify({'type': 'pong', 'time': obj['time']});
+            let resp = JSON.stringify({'type': 'pong', 'id': obj['id'], 'time': obj['time']});
             ws.send(resp);
             break;
         case 'ack':
@@ -66,15 +65,23 @@ ws.on('error', function error(err){
     console.log('error: ' + err);
 });
 
+var tick = 0;
 var x = 0.0;
 var y = 0.0;
 
 setInterval(function update() {
     if (ws.readyState === 1){
         if (ID != -1){
-            ws.send(JSON.stringify({'type': 'player_position', 'id': ID, 'x': x, 'y': y}));
+            if (tick % 15 === 0){
+                ws.send(JSON.stringify({'type': 'ping', 'id': ID, 'time': (new Date().getTime())}));
+            } else {
+                ws.send(JSON.stringify({'type': 'player_position', 'id': ID, 'x': x, 'y': y}));
+            }
             x += 0.1;
             y += 0.1;
+            tick++;
         }
+    } else if (ws.readyState === 3){
+        return;
     }
 }, 1000/30);
