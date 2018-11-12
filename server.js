@@ -20,7 +20,7 @@ wss.on('connection', function connection(ws){
         switch (obj['type']){
             case 'connect':
                 let id = players.length;
-                players.push({'ws': ws});
+                players.push({'id': id, 'ws': ws});
                 resp_d(ws, {'type': 'id', 'id': id});
                 resp_d(ws, {'type': 'ping', 'time': (new Date().getTime())});
                 break;
@@ -32,6 +32,15 @@ wss.on('connection', function connection(ws){
             case 'ping':
                 let resp = JSON.stringify({'type': 'pong', 'time': obj['time']});
                 ws.send(resp);
+                break;
+            case 'player_position':
+                for (let i = 0; i < players.length; i++){
+                    if (obj['id'] != players[i]['id']){
+                        if (players[i]['ws'].readyState != 'CLOSED'){
+                            resp_d(players[i]['ws'], obj);
+                        }
+                    }
+                }
                 break;
             default:
                 resp_d(ws, {'type': 'error', 'message': 'given type not found'});

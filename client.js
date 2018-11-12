@@ -29,6 +29,7 @@ ws.on('open', function open() {
     let start = new Date().getTime();
     ws.send(JSON.stringify(INIT_MSG));
     ws.send(JSON.stringify({'type': 'ping', 'time': (new Date().getTime())}));
+    ws.send(JSON.stringify({'type': 'player_position', 'id': ID, 'x': 0, 'y': 0}));
 });
 
 ws.on('message', function incoming(data) {
@@ -53,6 +54,9 @@ ws.on('message', function incoming(data) {
             break;
         case 'ack':
             console.log('ACK: ' + obj['message']);
+            break;
+        case 'player_position':
+            console.log('Updated player ' + obj['id'] + ' position to ' + obj['x'] + ', ' + obj['y']);
             break;
         default:
             break;
