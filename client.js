@@ -54,7 +54,7 @@ ws.on('message', function incoming(data) {
             console.log('ACK: ' + obj['message']);
             break;
         case 'player_position':
-            console.log('Updated player ' + obj['id'] + ' position to ' + obj['x'] + ', ' + obj['y']);
+            //console.log('Updated player ' + obj['id'] + ' position to ' + obj['x'] + ', ' + obj['y']);
             break;
         default:
             break;

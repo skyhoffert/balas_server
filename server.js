@@ -18,8 +18,11 @@ wss.on('connection', function connection(ws){
         //console.log(obj);
 
         switch (obj['type']){
+            case 'ack':
+                break;
             case 'connect':
                 let id = Object.keys(players).length;
+                console.log(id + ' given');
                 players[id] = {'ws': ws};
                 resp_d(ws, {'type': 'id', 'id': id});
                 resp_d(ws, {'type': 'ping', 'id': id, 'time': (new Date().getTime())});
@@ -36,15 +39,13 @@ wss.on('connection', function connection(ws){
             case 'player_position':
                 for (let i = 0; i < Object.keys(players).length; i++){
                     let id = Object.keys(players)[i];
-                    console.log(id);
-                    if (obj['id'] != id){
-                        if (players[id]['ws'].readyState === 1){
-                            resp_d(players[id]['ws'], obj);
-                        }
+                    if (players[id]['ws'].readyState === 1){
+                        resp_d(players[id]['ws'], obj);
                     }
                 }
                 break;
             default:
+                console.log(obj);
                 resp_d(ws, {'type': 'error', 'message': 'given type not found'});
                 break;
         }
