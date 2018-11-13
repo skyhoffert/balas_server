@@ -22,6 +22,9 @@ const CODE_S = 83;
 const CODE_SPACE = 32;
 const CODE_SHIFT = 16;
 
+const GRAB_TIME_MAX = 3000; // ms
+const GRAB_TIME_COOLDOWN = 2000; // ms
+
 /* GLOBAL VARIABLES ****************************************************************************************************/
 var seed = SEED_INIT;
 var score_l = 0;
@@ -162,6 +165,8 @@ class Player extends Entity {
         this.grab_ball = null;
         this.grab_angle = 0;
         this.grab_time = 0;
+        this.release_time = 0;
+        this.can_grab = true;
     }
 
     keydown(code){
@@ -184,13 +189,18 @@ class Player extends Entity {
                 this.grab_dir = 1;
                 this.grab_ball.speed = BALL_SPEED;
                 this.grab_ball = null;
+                this.release_time = curtime;
+                this.can_grab = false;
             }
         }
     }
 
     interact(b){
+        if (new Date().getTime() > (this.release_time + GRAB_TIME_COOLDOWN)){
+            this.can_grab = true;
+        }
         if (this.keys[CODE_SPACE]){
-            if (!b.grabbed){
+            if (this.can_grab && !b.grabbed){
                 this.grab_ball = b;
                 let dist = distance_to(this.x, this.y, this.grab_ball.x, this.grab_ball.y);
                 if (dist < this.grab_range && dist > this.width/2){
@@ -210,9 +220,24 @@ class Player extends Entity {
             } else {
                 if (this.grab_ball != null){
                     let curtime = new Date().getTime();
-                    this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
-                    this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
-                    this.grab_ball.speed += 0.02;
+                    if (curtime > this.grab_time + GRAB_TIME_MAX){
+                        let ang = this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir;
+                        this.grab_ball.velx = Math.cos(ang) * this.grab_dir;
+                        this.grab_ball.vely = -Math.sin(ang) * this.grab_dir;
+                        //this.grab_ball.speed = BALL_SPEED;
+                        this.grab_ball.normalize_velocity();
+                        this.grab_ball.kinematic = true;
+                        this.grab_ball.grabbed = false;
+                        this.grab_dir = 1;
+                        this.grab_ball.speed = BALL_SPEED;
+                        this.grab_ball = null;
+                        this.release_time = curtime;
+                        this.can_grab = false;
+                    } else {
+                        this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
+                        this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
+                        this.grab_ball.speed += 0.02;
+                    }
                 }
             }
         }
@@ -260,6 +285,8 @@ var b = new Ball(WIDTH/2, HEIGHT/2);
 var ball = {'entity': b};
 
 var walls = [];
+
+seed = new Date().getTime();
 
 walls.push(new Wall(WIDTH*1/2, HEIGHT*1/8, WIDTH*3/4 + 16, 16, 'blue', 0));
 walls.push(new Wall(WIDTH*1/2, HEIGHT*7/8, WIDTH*3/4 + 16, 16, 'blue', 0));
@@ -361,7 +388,7 @@ function send_state(){
     }
 
     for (let i = 0; i < Object.keys(players).length; i++){
-        resp_d(players[Object.keys(players)[i]]['ws'], {'type': 'tick', 'players': ps, 'ball': ball['entity']});
+        resp_d(players[Object.keys(players)[i]]['ws'], {'type': 'tick', 'players': ps, 'ball': ball['entity'], 'score_l': score_l, 'score_r': score_r});
     }
 }
 
