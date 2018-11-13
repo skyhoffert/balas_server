@@ -177,7 +177,7 @@ class Player extends Entity {
                 let ang = this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir;
                 this.grab_ball.velx = Math.cos(ang) * this.grab_dir;
                 this.grab_ball.vely = -Math.sin(ang) * this.grab_dir;
-                this.grab_ball.speed = BALL_SPEED;
+                //this.grab_ball.speed = BALL_SPEED;
                 this.grab_ball.normalize_velocity();
                 this.grab_ball.kinematic = true;
                 this.grab_ball.grabbed = false;
@@ -212,7 +212,7 @@ class Player extends Entity {
                     let curtime = new Date().getTime();
                     this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
                     this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
-                    this.grab_ball.speed += 0.1;
+                    this.grab_ball.speed += 0.02;
                 }
             }
         }
