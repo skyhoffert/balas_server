@@ -14,6 +14,11 @@ const BALL_SIZE = 12;
 
 const PLAYER_SPEED = 5;
 const PLAYER_SIZE = 32;
+const PLAYER_COLOR_L = '#47d147';
+const PLAYER_COLOR_R = '#ff00ff';
+
+const WALL_THICKNESS = 32;
+const WALL_COLOR = 'blue';
 
 const CODE_A = 65;
 const CODE_D = 68;
@@ -29,6 +34,7 @@ const BALL_SPEED_INCREASE = 0.00002;
 
 /* GLOBAL VARIABLES ****************************************************************************************************/
 var seed = SEED_INIT;
+
 var score_l = 0;
 var score_r = 0;
 
@@ -109,10 +115,10 @@ class Ball extends Entity {
     move(){
         super.move();
         
-        if (this.x < WIDTH*1/8-16){
+        if (this.x+this.width/2 < WIDTH*1/8){
             this.kinematic = false;
             this.scored = -1;
-        } else if (this.x > WIDTH*7/8+16){
+        } else if (this.x-this.width/2 > WIDTH*7/8){
             this.kinematic = false;
             this.scored = 1;
         }
@@ -137,7 +143,8 @@ class Ball extends Entity {
                     this.normalize_velocity();
                     return;
                 }
-            } else if (this.y > w.y-w.height/2 && this.y < w.y+w.height/2){
+            } 
+            if (this.y > w.y-w.height/2 && this.y < w.y+w.height/2){
                 let dist = w.x - this.x;
                 if (Math.abs(dist) <= this.width/2 + w.width/2 && Math.sign(dist) === Math.sign(this.velx)){
                     this.velx = -this.velx;
@@ -161,9 +168,9 @@ class Wall extends Entity {
 }
 
 class Player extends Entity {
-    constructor(x, y){
+    constructor(x, y, c){
         super(x, y, PLAYER_SIZE, PLAYER_SIZE);
-        this.color = "#"+((1<<24)*random(0,1)|0).toString(16);
+        this.color = c;
         this.vely = 0;
         this.velx = 0;
         this.kinematic = true;
@@ -300,12 +307,12 @@ var walls = [];
 
 seed = new Date().getTime();
 
-walls.push(new Wall(WIDTH*1/2, HEIGHT*1/8, WIDTH*3/4 + 16, 16, 'blue', 0));
-walls.push(new Wall(WIDTH*1/2, HEIGHT*7/8, WIDTH*3/4 + 16, 16, 'blue', 0));
-walls.push(new Wall(WIDTH*1/8, HEIGHT*1/4, 16, HEIGHT*1/4, 'blue', 0));
-walls.push(new Wall(WIDTH*1/8, HEIGHT*3/4, 16, HEIGHT*1/4, 'blue', 0));
-walls.push(new Wall(WIDTH*7/8, HEIGHT*1/4, 16, HEIGHT*1/4, 'blue', 0));
-walls.push(new Wall(WIDTH*7/8, HEIGHT*3/4, 16, HEIGHT*1/4, 'blue', 0));
+walls.push(new Wall(WIDTH*1/2, HEIGHT*1/8, WIDTH*3/4 + WALL_THICKNESS, WALL_THICKNESS, WALL_COLOR, 0));
+walls.push(new Wall(WIDTH*1/2, HEIGHT*7/8, WIDTH*3/4 + WALL_THICKNESS, WALL_THICKNESS, WALL_COLOR, 0));
+walls.push(new Wall(WIDTH*1/8, HEIGHT*1/4, WALL_THICKNESS, HEIGHT*1/4, WALL_COLOR, 0));
+walls.push(new Wall(WIDTH*1/8, HEIGHT*3/4, WALL_THICKNESS, HEIGHT*1/4, WALL_COLOR, 0));
+walls.push(new Wall(WIDTH*7/8, HEIGHT*1/4, WALL_THICKNESS, HEIGHT*1/4, WALL_COLOR, 0));
+walls.push(new Wall(WIDTH*7/8, HEIGHT*3/4, WALL_THICKNESS, HEIGHT*1/4, WALL_COLOR, 0));
 
 const wss = new WebSocket.Server({
   port: 5000
@@ -330,7 +337,7 @@ wss.on('connection', function connection(ws){
             case 'connect':
                 let id = Object.keys(players).length;
                 console.log(id + ' given');
-                players[id] = {'ws': ws, 'entity': new Player(WIDTH/2, HEIGHT/2)};
+                players[id] = {'ws': ws, 'entity': new Player(WIDTH/4 + (id%2)*WIDTH/2, HEIGHT/2, id%2 ? PLAYER_COLOR_R : PLAYER_COLOR_L)};
                 resp_d(ws, {'type': 'id', 'id': id});
                 resp_d(ws, {'type': 'ping', 'id': id, 'time': (new Date().getTime())});
                 break;
@@ -343,13 +350,9 @@ wss.on('connection', function connection(ws){
                 let resp = JSON.stringify({'type': 'pong', 'id': obj['id'], 'time': obj['time']});
                 ws.send(resp);
                 break;
-            case 'player_position':
-                for (let i = 0; i < Object.keys(players).length; i++){
-                    let id = Object.keys(players)[i];
-                    if (players[id]['ws'].readyState === 1){
-                        resp_d(players[id]['ws'], obj);
-                    }
-                }
+            case 'reset':
+                reset_game(true);
+                console.log('Rest command received');
                 break;
             case 'key':
                 if (obj['down']){
@@ -364,6 +367,15 @@ wss.on('connection', function connection(ws){
                 break;
         }
     });
+
+    ws.on('close', function close(){
+        for (let i = 0; i < Object.keys(players).length; i++){
+            let id = Object.keys(players)[i];
+            if (players[id]['ws'] === ws){
+                delete players[id];
+            }
+        }
+    })
 });
 
 // set frame rate to UPDATE_RATE
@@ -389,8 +401,16 @@ function update(){
     send_state();
 }
 
-function reset_game(){
+function reset_game(full=false){
     ball['entity'] = new Ball(WIDTH/2, HEIGHT/2);
+    if (full){
+        score_l = 0;
+        score_r = 0;
+
+        for (let i = 0; i < Object.keys(players).length; i++){
+            players[Object.keys(players)[i]]['entity'] = new Player(WIDTH/4 + (i%2)*WIDTH/2, HEIGHT/2, i%2 ? PLAYER_COLOR_R : PLAYER_COLOR_L);
+        }
+    }
 }
 
 function send_state(){
@@ -403,7 +423,6 @@ function send_state(){
         resp_d(players[Object.keys(players)[i]]['ws'], {'type': 'tick', 'players': ps, 'ball': ball['entity'], 'score_l': score_l, 'score_r': score_r});
     }
 }
-
 /*
 Find the vector distance between 2 points
     @arg x1: int; point x1
