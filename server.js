@@ -20,6 +20,7 @@ const CODE_D = 68;
 const CODE_W = 87;
 const CODE_S = 83;
 const CODE_SPACE = 32;
+const CODE_SHIFT = 16;
 
 /* GLOBAL VARIABLES ****************************************************************************************************/
 var seed = SEED_INIT;
@@ -150,7 +151,7 @@ class Wall extends Entity {
 class Player extends Entity {
     constructor(x, y){
         super(x, y, PLAYER_SIZE, PLAYER_SIZE);
-        this.color = "#"+((1<<24)*Math.random()|0).toString(16);
+        this.color = "#"+((1<<24)*random(0,1)|0).toString(16);
         this.vely = 0;
         this.velx = 0;
         this.kinematic = true;
@@ -221,8 +222,8 @@ class Player extends Entity {
             lr /= Math.sqrt(2);
             ud /= Math.sqrt(2);
         }
-        this.velx = lr;
-        this.vely = ud;
+        this.velx = this.keys[CODE_SHIFT] ? lr * 2 : lr;
+        this.vely = this.keys[CODE_SHIFT] ? ud * 2 : ud;
         super.move();
     }
     
