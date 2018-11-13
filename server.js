@@ -25,6 +25,8 @@ const CODE_SHIFT = 16;
 const GRAB_TIME_MAX = 3000; // ms
 const GRAB_TIME_COOLDOWN = 2000; // ms
 
+const BALL_SPEED_INCREASE = 0.00002;
+
 /* GLOBAL VARIABLES ****************************************************************************************************/
 var seed = SEED_INIT;
 var score_l = 0;
@@ -92,8 +94,9 @@ class Ball extends Entity {
     constructor(x, y){
         super(x, y, BALL_SIZE, BALL_SIZE);
         this.color = 'red';
-        this.velx = random(-1,1);
-        this.vely = random(-1,1);
+        this.velx = random(-1, 1);
+        this.vely = random(-1, 1);
+        this.velx = 0;
         this.speed = BALL_SPEED;
         this.kinematic = true;
         this.id = 'ball';
@@ -108,17 +111,19 @@ class Ball extends Entity {
         
         if (this.x < WIDTH*1/8-16){
             this.kinematic = false;
-            this.scored = 1;
+            this.scored = -1;
         } else if (this.x > WIDTH*7/8+16){
             this.kinematic = false;
-            this.scored = -1;
+            this.scored = 1;
         }
     }
 
     normalize_velocity(){
         let mag = magnitude(this.velx, this.vely);
-        this.velx = this.velx / mag * this.speed;
-        this.vely = this.vely / mag * this.speed;
+        if (mag > 0.001){
+            this.velx = this.velx / mag * this.speed;
+            this.vely = this.vely / mag * this.speed;
+        }
     }
 
     wall_collision(walls){
@@ -129,11 +134,15 @@ class Ball extends Entity {
                 let dist = w.y - this.y;
                 if (Math.abs(dist) <= this.height/2 + w.height/2 && Math.sign(dist) === Math.sign(this.vely)){
                     this.vely = -this.vely;
+                    this.normalize_velocity();
+                    return;
                 }
             } else if (this.y > w.y-w.height/2 && this.y < w.y+w.height/2){
                 let dist = w.x - this.x;
                 if (Math.abs(dist) <= this.width/2 + w.width/2 && Math.sign(dist) === Math.sign(this.velx)){
                     this.velx = -this.velx;
+                    this.normalize_velocity();
+                    return;
                 }
             }
         }
@@ -182,7 +191,6 @@ class Player extends Entity {
                 let ang = this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir;
                 this.grab_ball.velx = Math.cos(ang) * this.grab_dir;
                 this.grab_ball.vely = -Math.sin(ang) * this.grab_dir;
-                //this.grab_ball.speed = BALL_SPEED;
                 this.grab_ball.normalize_velocity();
                 this.grab_ball.kinematic = true;
                 this.grab_ball.grabbed = false;
@@ -224,7 +232,6 @@ class Player extends Entity {
                         let ang = this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir;
                         this.grab_ball.velx = Math.cos(ang) * this.grab_dir;
                         this.grab_ball.vely = -Math.sin(ang) * this.grab_dir;
-                        //this.grab_ball.speed = BALL_SPEED;
                         this.grab_ball.normalize_velocity();
                         this.grab_ball.kinematic = true;
                         this.grab_ball.grabbed = false;
@@ -236,28 +243,27 @@ class Player extends Entity {
                     } else {
                         this.grab_ball.x = this.x + Math.sin(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
                         this.grab_ball.y = this.y + Math.cos(this.grab_angle + (curtime - this.grab_time) * this.grab_ball.speed/1000 * this.grab_dir) * this.grab_range;
-                        this.grab_ball.speed += 0.02;
+                        this.grab_ball.speed += (curtime - this.grab_time) * BALL_SPEED_INCREASE;
                     }
                 }
             }
         }
     }
-
-    move(){
+    
+    wall_collision(walls){
+        // first, calculate movement based on keyboard input
         let lr = this.keys[CODE_A] ? -this.speed : this.keys[CODE_D] ? this.speed : 0.0;
         let ud = this.keys[CODE_W] ? -this.speed : this.keys[CODE_S] ? this.speed : 0.0;
         if (Math.abs(lr) > 0 && Math.abs(ud) > 0){
             lr /= Math.sqrt(2);
             ud /= Math.sqrt(2);
         }
-        this.velx = this.keys[CODE_SHIFT] ? lr * 2 : lr;
-        this.vely = this.keys[CODE_SHIFT] ? ud * 2 : ud;
-        super.move();
-    }
-    
-    wall_collision(walls){
+        this.velx = lr;
+        this.vely = ud;
+
+        // then check if velocities are okay for walls
         for (let i = 0; i < walls.length; i++){
-            let w = walls[i]
+            let w = walls[i];
             // check vertical
             if (this.x > w.x-w.width/2 && this.x < w.x+w.width/2){
                 let dist = w.y - this.y;
@@ -270,6 +276,12 @@ class Player extends Entity {
                     this.velx = 0;
                 }
             }
+        }
+
+        if (this.x-this.width/2 < WIDTH/8 && this.velx < 0){
+            this.velx = 0;
+        } else if (this.x+this.width/2 > WIDTH*7/8 && this.velx > 0){
+            this.velx = 0;
         }
     }
 }
@@ -361,8 +373,8 @@ function update(){
     for (let i = 0; i < Object.keys(players).length; i++){
         ent = players[Object.keys(players)[i]]['entity'];
         ent.interact(ball['entity']);
-        ent.move();
         ent.wall_collision(walls);
+        ent.move();
     }
 
     ball['entity'].move();
