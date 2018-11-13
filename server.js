@@ -9,10 +9,10 @@ const WIDTH = 1600;
 const HEIGHT = 900;
 const UPDATE_RATE = 1000/60;
 
-const BALL_SPEED = 6;
+const BALL_SPEED = 8;
 const BALL_SIZE = 12;
 
-const PLAYER_SPEED = 4;
+const PLAYER_SPEED = 5;
 const PLAYER_SIZE = 32;
 
 const CODE_A = 65;
